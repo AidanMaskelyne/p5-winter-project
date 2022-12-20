@@ -1,46 +1,83 @@
 import p5 from "p5";
 
+import Common from "../Common";
 import Bullet from "./Bullet";
 
-const PLAYER_WIDTH = 30
-const PLAYER_HEIGHT = 75;
-
-/// For player objects, the `update()` method should be called before the `render()` method.
-/// This is because render does not change the player's position, it just renderes based on the
-/// encapsulated x and y coords. The update function, however, only modified the position.
 class Player {
 	p: p5;
-	x: number;
-	y: number;
-	isHit: boolean = false;
+	direction: number;
+	pos: p5.Vector;
+	vel: p5.Vector;
+	speed: number;
 	bullets: Array<Bullet> = [];
 
-	constructor(p: p5) {
+	constructor(p: p5, speed: number) {
 		this.p = p;
-		this.y = this.p.height - (100 + PLAYER_HEIGHT); // Will always position the player just above the bottom line
-		this.x = this.p.width / 2;
-	}
 
-	shoot() {
-		this.bullets.push(new Bullet(this.p, this.x, this.y));
-		console.log(this.bullets);
-		console.log(this.bullets[0]);
+		this.pos = p.createVector(this.p.width / 2, this.p.height - (100 + Common.PLAYER_HEIGHT/2));
+		this.vel = p.createVector(0, 0);
 
-	}
-
-	// TODO: Add player control.
-	update() {
-
+		this.speed = speed * Common.SPEED_SCALAR;
 	}
 
 	render() {
+		this.p.push();
+
+		this.p.translate(this.pos.x, this.pos.y);
+
+		if (this.p.keyIsDown(Common.LEFT_ARROW)) this.direction = 1;
+		if (this.p.keyIsDown(Common.RIGHT_ARROW)) this.direction = -1;
+
 		this.p.fill("red");
-		this.p.rect(this.x, this.y, PLAYER_WIDTH, PLAYER_HEIGHT);
+		this.p.rectMode(this.p.CENTER);
+		this.p.rect(0, 0, Common.PLAYER_WIDTH, Common.PLAYER_HEIGHT);
+
+		this.p.pop();
+	}
+
+	tick() {
+		this.vel.add(Common.GRAVITY);
+		this.vel.x *= 1 - Common.FRICTION;
+		this.pos.add(this.vel);
+
+		this.pos.y = this.p.height - (100 + Common.PLAYER_HEIGHT/2);
+
+		// Basic LEFT <-> RIGHT movement with arrow keys.
+		// TODO: Could maybe add A and D as an alternative?
+		if (this.p.keyIsDown(Common.LEFT_ARROW)) this.vel.x -= this.speed;
+		if (this.p.keyIsDown(Common.RIGHT_ARROW)) this.vel.x += this.speed;
+
+		if (this.pos.x < Common.PLAYER_WIDTH/2) {
+			this.pos.x = Common.PLAYER_WIDTH/2;
+			this.vel.x = 0;
+		} else if (this.pos.x > Common.CANVAS_WIDTH - Common.PLAYER_WIDTH/2) {
+			this.pos.x = Common.CANVAS_WIDTH - Common.PLAYER_WIDTH/2;
+			this.vel.x = 0;
+		}
 
 		for (let i = 0; i < this.bullets.length; i++) {
+
+			// Cull the bullets that are no longer on screen
+			if (this.bullets[i].pos.y < 0) {
+				this.bullets.splice(i, 1);
+				continue;
+			}
+
+			this.bullets[i].tick();
 			this.bullets[i].render();
-			// console.log(`i = ${i}`);
 		}
+
+		// Check for space button held to shoot
+		if (this.p.keyIsDown(32)) {
+			this.shoot();
+		}
+	}
+
+	shoot() {
+		let bulletPos = this.pos.copy().sub(0, Common.PLAYER_HEIGHT / 2);
+		let bulletOffset = this.p.random((-Common.PLAYER_WIDTH/2) + 5, (Common.PLAYER_WIDTH/2) -5);
+
+		this.bullets.push(new Bullet(this.p, bulletPos, bulletOffset));
 	}
 }
 
